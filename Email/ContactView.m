@@ -9,334 +9,137 @@
 #import "ContactView.h"
 #import "TextRange.h"
 
-@implementation ContactView
-@synthesize inputDelegate;
-@synthesize tokenizer;
+@implementation ContactItem
 
-- (id)initWithFrame:(CGRect)frame
-{
-    self = [super initWithFrame:frame];
+-(id)initWithContact:(id)contact{
+    self = [super init];
     if (self) {
-        // Initialization code
-        _contacts = [NSMutableArray array];
-        [self setBackgroundColor:[UIColor clearColor]];
+        _contact = contact;
+        [self setTextColor:[UIColor blueColor]];
+        [self setHighlightedTextColor:[UIColor whiteColor]];
+        NSString *display = [_contact objectForKey:@"name"] ? : [_contact objectForKey:@"mail"];
+        if (display) {
+            CGSize size = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:self.font forKey:NSFontAttributeName]];
+            [self setFrame:CGRectMake(4, 2, size.width+8, size.height+4)];
+            [self setText:display];
+            [self setTextAlignment:NSTextAlignmentCenter];
+        }
+
     }
     return self;
 }
 
--(UIKeyboardType)keyboardType{
-    return UIKeyboardTypeEmailAddress;
+-(void)setSelected:(BOOL)selected{
+    _selected = selected;
+    [self setHighlighted:YES];
 }
 
--(void)drawRect:(CGRect)rect{
-    [super drawRect:rect];
-    CGFloat x = 2.0;
-    CGContextRef context = UIGraphicsGetCurrentContext();
-    for (NSDictionary *c in _contacts) {
-        NSString *display = [c objectForKey:@"name"] ? [c objectForKey:@"name"] : [c objectForKey:@"mail"];
-        CGSize nameSize = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        CGFloat fullWidth = nameSize.width + 10;
-        
-        UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(x, 2, fullWidth, self.bounds.size.height-4) cornerRadius:10];
-        CGContextAddPath(context, path.CGPath);
-        [[UIColor greenColor] setFill];
-        CGContextFillPath(context);
-        
-        [[UIColor whiteColor] setFill];
-        
-        CGRect nameRect =CGRectMake(x+5, (self.bounds.size.height-nameSize.height)/2, nameSize.width, self.bounds.size.height-4);
-        [display drawInRect:nameRect withAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        x += fullWidth;
-        [@"," drawAtPoint:CGPointMake(x+1, CGRectGetMaxY(nameRect)) withAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        x += 2.0;
+
+@end
+
+@implementation ContactView
+
+-(id)initWithFrame:(CGRect)frame{
+    self = [super initWithFrame:frame];
+    if (self) {
+        _contacts = [NSMutableArray array];
+        _font = [UIFont systemFontOfSize:15];
+        _lineHeight = frame.size.height;
+        _inputTextField = [[UITextField alloc] initWithFrame:self.bounds];
+        [_inputTextField setDelegate:self];
+        [_inputTextField setFont:_font];
+        [_inputTextField setKeyboardType:UIKeyboardTypeEmailAddress];
+        [_inputTextField addTarget:self action:@selector(inputTextChanged:) forControlEvents:UIControlEventValueChanged];
+        [self addSubview:_inputTextField];
     }
-    if (_inputingText) {
-        UIFont *font = [UIFont systemFontOfSize:15];
-        [_inputingText drawAtPoint:CGPointMake(x, (self.bounds.size.height-font.lineHeight)/2) withAttributes:[NSDictionary dictionaryWithObject:font forKey:NSFontAttributeName]];
-    }
+    return self;
 }
 
-- (NSComparisonResult)comparePosition:(UITextPosition *)position toPosition:(UITextPosition *)other{
-    return [[NSNumber numberWithInteger:[(TextPosition*)position location]]  compare:[NSNumber numberWithInteger:[(TextPosition*)other location]]];
-}
-
-- (NSInteger)offsetFromPosition:(UITextPosition *)from toPosition:(UITextPosition *)toPosition{
-    return [(TextPosition*)toPosition location] - [(TextPosition*)from location];
-}
-
-- (NSString *)textInRange:(UITextRange *)range{
-    if ([(TextPosition*)range.start location] < [_contacts count]) {
-        id c = [_contacts objectAtIndex:[(TextPosition*)range.start location]];
-        return [c objectForKey:@"mail"];
-    }else{
-        NSRange txtRange = NSMakeRange([(TextPosition*)range.start location]-[_contacts count], [(TextRange*)range length]);
-        if (txtRange.location!=NSNotFound) {
-            return [_inputingText substringWithRange:txtRange];
-        }
-        return nil;
-    }
-}
-
-- (void)replaceRange:(UITextRange *)range withText:(NSString *)text{
-    if ([(TextPosition*)range.start location] < [_contacts count]) {
-        
-    }else{
-        NSInteger s = [(TextPosition*)range.start location]-[_contacts count];
-        [_inputingText replaceCharactersInRange:NSMakeRange(s, [(TextRange*)range length]) withString:text];
-    }
-}
-
--(UITextPosition*)beginningOfDocument{
-    TextPosition *pos = [[TextPosition alloc] init];
-    pos.location = 0;
-    return pos;
-}
-
--(UITextPosition*)endOfDocument{
-    TextPosition *pos = [[TextPosition alloc] init];
-    pos.location = [_contacts count] + _inputingText.length;
-    return pos;
-}
-
-- (UITextRange *)textRangeFromPosition:(UITextPosition *)fromPosition toPosition:(UITextPosition *)toPosition{
-    NSInteger start = [(TextPosition*)fromPosition location];
-    NSInteger end = [(TextPosition*)toPosition location];
-    return [[TextRange alloc] initWithNSRange:NSMakeRange(start, end-start)];
-}
-
-- (UITextPosition *)positionFromPosition:(UITextPosition *)position offset:(NSInteger)offset{
-    TextPosition *pos = [[TextPosition alloc] init];
-    pos.location = offset;
-    return pos;
-}
-
-- (UITextPosition *)positionFromPosition:(UITextPosition *)position inDirection:(UITextLayoutDirection)direction offset:(NSInteger)offset{
-    TextPosition *pos = [[TextPosition alloc] init];
-    pos.location = offset + [(TextPosition*)position location];
-    return pos;
-}
-
-- (UITextPosition *)positionWithinRange:(UITextRange *)range farthestInDirection:(UITextLayoutDirection)direction{
-    return range.end;
-}
-
-- (UITextRange *)characterRangeByExtendingPosition:(UITextPosition *)position inDirection:(UITextLayoutDirection)direction{
-    NSInteger loc = [(TextPosition*)position location];
-    return [[TextRange alloc] initWithNSRange:NSMakeRange(loc, 1)];
-}
-
-- (void)setMarkedText:(NSString *)markedText selectedRange:(NSRange)selectedRange{
+-(void)layoutSubviews{
+    CGFloat x = 4;
+    CGFloat y = (_lineHeight - self.font.lineHeight)/2;
     
-}
-
--(UITextRange*)markedTextRange{
-    return [[TextRange alloc] initWithNSRange:NSMakeRange([_contacts count]+[_inputingText length], 0)];
-}
-
--(UITextRange*)selectedTextRange{
-    return nil;
-}
-
-- (UITextWritingDirection)baseWritingDirectionForPosition:(UITextPosition *)position inDirection:(UITextStorageDirection)direction{
-    return UITextWritingDirectionLeftToRight;
-}
-
-- (void)setBaseWritingDirection:(UITextWritingDirection)writingDirection forRange:(UITextRange *)range{
-    
-}
-
-- (CGRect)firstRectForRange:(UITextRange *)range{
-    NSInteger loc = [(TextPosition*)range.start location];
-    if (loc < [_contacts count]) {
-        float x = 2.0;
-        for (NSInteger i = 0; i < loc; i ++) {
-            id c =  [_contacts objectAtIndex:i];
-            NSString *display = [c objectForKey:@"name"] ? [c objectForKey:@"name"] : [c objectForKey:@"mail"];
-            CGSize nameSize = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-            CGFloat fullWidth = nameSize.width + 10;
-            x += fullWidth;
-            x += 2.0;
+    for (ContactItem *item in _contacts) {
+        CGRect itemRect  = [item frame];
+        if (x > 4 && itemRect.size.width + x > self.bounds.size.width - 4) {
+            y += _font.lineHeight + 4;
+            x = 4;
         }
-        
-        id c =  [_contacts objectAtIndex:loc];
-        NSString *display = [c objectForKey:@"name"] ? [c objectForKey:@"name"] : [c objectForKey:@"mail"];
-        CGSize nameSize = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        CGFloat fullWidth = nameSize.width + 10;
-        return CGRectMake(x, 0, fullWidth, self.bounds.size.height);
-    }else{
-        float x = 2.0;
-        for (NSInteger i = 0; i < [_contacts count]; i ++) {
-            id c =  [_contacts objectAtIndex:i];
-            NSString *display = [c objectForKey:@"name"] ? [c objectForKey:@"name"] : [c objectForKey:@"mail"];
-            CGSize nameSize = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-            CGFloat fullWidth = nameSize.width + 10;
-            x += fullWidth;
-            x += 2.0;
-        }
-        NSInteger len = [(TextPosition*)range.start location] - [_contacts count];
-        NSString *preTxt = [self textInRange:[[TextRange alloc] initWithNSRange:NSMakeRange([_contacts count], len)]];
-        CGSize txtSize = [preTxt sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        x += txtSize.width;
-        return CGRectMake(x, 0, [UIFont systemFontOfSize:15].pointSize, self.bounds.size.height);
+        itemRect.origin.y = y;
+        itemRect.origin.x = x;
+        x += itemRect.size.width;
+        [item setFrame:itemRect];
     }
-}
-
-- (CGRect)caretRectForPosition:(UITextPosition *)position{
-    NSInteger loc = [(TextPosition*)position location];
-    if (loc < [_contacts count]) {
-        float x = 2.0;
-        for (NSInteger i = 0; i < loc; i ++) {
-            id c =  [_contacts objectAtIndex:i];
-            NSString *display = [c objectForKey:@"name"] ? [c objectForKey:@"name"] : [c objectForKey:@"mail"];
-            CGSize nameSize = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-            CGFloat fullWidth = nameSize.width + 10;
-            x += fullWidth;
-            x += 2.0;
-        }
-        
-        id c =  [_contacts objectAtIndex:loc];
-        NSString *display = [c objectForKey:@"name"] ? [c objectForKey:@"name"] : [c objectForKey:@"mail"];
-        CGSize nameSize = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        CGFloat fullWidth = nameSize.width + 10;
-        return CGRectMake(x, 0, fullWidth, self.bounds.size.height);
-    }else{
-        float x = 2.0;
-        for (NSInteger i = 0; i < [_contacts count]; i ++) {
-            id c =  [_contacts objectAtIndex:i];
-            NSString *display = [c objectForKey:@"name"] ? [c objectForKey:@"name"] : [c objectForKey:@"mail"];
-            CGSize nameSize = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-            CGFloat fullWidth = nameSize.width + 10;
-            x += fullWidth;
-            x += 2.0;
-        }
-        NSInteger len = [(TextPosition*)position location] - [_contacts count];
-        NSString *preTxt = [self textInRange:[[TextRange alloc] initWithNSRange:NSMakeRange([_contacts count], len)]];
-        CGSize txtSize = [preTxt sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        x += txtSize.width;
-        return CGRectMake(x, 0, [UIFont systemFontOfSize:15].pointSize, self.bounds.size.height);
+    CGSize inputSize = [_inputTextField sizeThatFits:CGSizeMake(self.bounds.size.width, _font.lineHeight)];
+    if (x > 4 && inputSize.width + x > self.bounds.size.width - 4 ) {
+        y += _font.lineHeight + 4;
+        x = 4;
     }
+    [_inputTextField setFrame:CGRectMake(x, y, self.bounds.size.width-x,  _font.lineHeight+4)];
 }
 
-- (NSArray *)selectionRectsForRange:(UITextRange *)range{
-    NSMutableArray  *arr = [NSMutableArray array];
-    [arr addObject:[NSValue valueWithCGRect:[self firstRectForRange:range]]];
-    return arr;
-}
-
-- (UITextPosition *)closestPositionToPoint:(CGPoint)point{
-    NSInteger loc = 0;
-    float x = 2.0;
-    for (NSInteger i = 0; i < [_contacts count]; i ++) {
-        id c =  [_contacts objectAtIndex:i];
-        NSString *display = [c objectForKey:@"name"] ? [c objectForKey:@"name"] : [c objectForKey:@"mail"];
-        CGSize nameSize = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        CGFloat fullWidth = nameSize.width + 10;
-        if (point.x > x && point.x < x + fullWidth) {
-            loc = i;
-            break;
-        }
-        x += fullWidth;
-        x += 2.0;
-    }
-    if (point.x > x) {
-        NSString *preTxt = _inputingText;
-        CGSize txtSize = [preTxt sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        if (x + txtSize.width > point.x) {
-            loc = (point.x - x)/[UIFont systemFontOfSize:15].pointSize;
-            loc += [_contacts count];
-        }
-    }
-    TextPosition *pos = [[TextPosition alloc] init];
-    pos.location = loc;
-    return pos;
-}
-
-- (UITextPosition *)closestPositionToPoint:(CGPoint)point withinRange:(UITextRange *)range{
-    
-    NSInteger loc = 0;
-    float x = 2.0;
-    for (NSInteger i = 0; i < [_contacts count]; i ++) {
-        id c =  [_contacts objectAtIndex:i];
-        NSString *display = [c objectForKey:@"name"] ? [c objectForKey:@"name"] : [c objectForKey:@"mail"];
-        CGSize nameSize = [display sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        CGFloat fullWidth = nameSize.width + 10;
-        if (point.x > x && point.x < x + fullWidth) {
-            loc = i;
-            break;
-        }
-        x += fullWidth;
-        x += 2.0;
-    }
-    if (point.x > x) {
-        NSString *preTxt = _inputingText;
-        CGSize txtSize = [preTxt sizeWithAttributes:[NSDictionary dictionaryWithObject:[UIFont systemFontOfSize:15] forKey:NSFontAttributeName]];
-        if (x + txtSize.width > point.x) {
-            loc = (point.x - x)/[UIFont systemFontOfSize:15].pointSize;
-            loc += [_contacts count];
-        }
-    }
-    TextPosition *pos = [[TextPosition alloc] init];
-    pos.location = loc;
-    return pos;
-}
-
-- (UITextRange *)characterRangeAtPoint:(CGPoint)point{
-    TextPosition *pos = (TextPosition *)[self closestPositionToPoint:point];
-    TextRange *range = [[TextRange alloc] initWithNSRange:NSMakeRange(pos.location, 1)];
-    return range;
-}
-
-- (void)unmarkText{
-    
-}
-- (id<UITextInputTokenizer>)tokenizer {
-    if (tokenizer == nil) {
-        tokenizer = [[UITextInputStringTokenizer alloc] initWithTextInput:self];
-    }
-    return tokenizer;
-}
-
-- (BOOL)hasText{
-    return YES;
-}
-
-- (void)insertText:(NSString *)text{
-    if ([text isEqualToString:@"\n"]) {
-        if (_inputingText) {
-            NSDictionary *dic = [NSDictionary dictionaryWithObject:_inputingText forKey:@"mail"];
-            [_contacts addObject:dic];
-            _inputingText = nil;
-            [self setNeedsDisplay];
-        }
-    }else{
-        if (!_inputingText) {
-            _inputingText = [NSMutableString stringWithString:@""];
-        }
-        [_inputingText appendString:text];
-        [self setNeedsDisplay];
-    }
-}
-
-- (void)deleteBackward{
-    if (_inputingText && [_inputingText length] > 0) {
-        [_inputingText deleteCharactersInRange:NSMakeRange(_inputingText.length-1, 1)];
-    }else if([_contacts count] > 0){
-        [_contacts removeLastObject];
-    }
-    [self setNeedsDisplay];
-}
-
--(BOOL)canBecomeFirstResponder{
-    return true;
+-(void)setFont:(UIFont *)font{
+    _font = font;
+    [_inputTextField setFont:_font];
 }
 
 -(void)addContact:(id)contact{
-    [_contacts addObject:contact];
-    
-    [self setNeedsDisplay];
+    ContactItem *item = [[ContactItem alloc] initWithContact:contact];
+    [item setFont:_font];
+    [_contacts addObject:item];
+    [self addSubview:item];
+    [self setNeedsLayout];
 }
 
-- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event{
-    [self becomeFirstResponder];
+-(BOOL)textFieldShouldReturn:(UITextField *)textField{
+    if ([textField text] && [[textField text] length] > 0) {
+        NSString *txt = [textField text];
+        NSDictionary *dic = [NSDictionary dictionaryWithObject:[txt stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] forKey:@"mail"];
+        [self addContact:dic];
+        [textField setText:@" "];
+    }
+    return NO;
 }
+
+- (BOOL)textField:(UITextField *)textField shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string{
+    if ([string isEqualToString:@" "] || [string isEqualToString:@","]) {
+        [self textFieldShouldReturn:_inputTextField];
+        return NO;
+    }else if([string isEqualToString:@""]){
+        if ([[textField text] isEqualToString:@" "]) {
+            [self deleteBackward];
+        }else if(range.location == 0){
+            [textField setText:@" "];
+        }
+        return NO;
+    }
+    [self setNeedsLayout];
+    return YES;
+}
+
+-(void)deleteBackward{
+    if ([_contacts count] > 0) {
+        ContactItem *item = [_contacts lastObject];
+        if ([item selected]) {
+            [item removeFromSuperview];
+            [_contacts removeLastObject];
+            [self setNeedsLayout];
+        }else{
+            [item setSelected:YES];
+        }
+    }
+}
+
+-(BOOL)becomeFirstResponder{
+    return [_inputTextField becomeFirstResponder];
+}
+
+-(NSArray*)contacts{
+    NSMutableArray *contacts = [NSMutableArray array];
+    for (ContactItem *item in _contacts) {
+        [_contacts addObject:[item.contact copy]];
+    }
+    return contacts;
+}
+
 @end

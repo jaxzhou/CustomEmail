@@ -8,14 +8,29 @@
 
 #import <UIKit/UIKit.h>
 
-@interface ContactView : UIView <UITextInput,UITextInputTraits>{
-    NSMutableArray *_contacts;
-    NSMutableString *_inputingText;
-    id<UITextInputTokenizer> tokenizer;
+@interface ContactItem : UILabel{
+    
 }
 
-@property (nonatomic, assign) id <UITextInputDelegate> inputDelegate;
+@property (nonatomic,retain) id contact;
+@property (nonatomic,assign) BOOL selected;
+
+-(id)initWithContact:(id)contact;
+
+
+@end
+
+@interface ContactView : UIView <UITextFieldDelegate>{
+    NSMutableArray *_contacts;
+    UITextField *_inputTextField;
+    
+    CGFloat _lineHeight;
+}
+
+@property (nonatomic,retain) UIFont *font;
 
 -(void)addContact:(id)contact;
+
+-(NSArray*)contacts;
 
 @end
